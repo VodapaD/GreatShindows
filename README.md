@@ -4,6 +4,7 @@
 
 ## Структура
 * **Скрипт:** `AutoHotkey/combination.ahk`
+* **Скомпилированная версия:** `AutoHotkey/combination.exe`
 * **Версия AHK:** v2.0+
 
 ---
