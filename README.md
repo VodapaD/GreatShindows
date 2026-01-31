@@ -1,5 +1,5 @@
 <details>
-<summary><h2>AutoHotKey Script (нажми, чтобы развернуть)</h2></summary>
+<summary><h2>AutoHotKey Script</h2></summary>
 
 [cite_start]В данном репозитории хранится скрипт для автоматизации интерфейса Windows и расширения возможностей мыши. [cite: 1]
 
