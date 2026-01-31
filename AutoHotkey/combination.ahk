@@ -225,18 +225,18 @@ IsFullscreenAppActive()
     }
 }
 
-; === СКРОЛИНГ НА ЗАЖАТИЕ КОЛЕСИКА МЫШКИ ===
-
+; === ПЛАВНЫЙ СКРОЛИНГ НА ЗАЖАТИЕ КОЛЕСИКА МЫШКИ ===
 global isScrolling := false
 global startX := 0
 global startY := 0
-global virtualY := 0  ; Виртуальная позиция для отслеживания движения
+global virtualY := 0  ; Накопленное смещение
+scrollThreshold := 5
 
 MButton::
 {
     global isScrolling, startX, startY, virtualY
     MouseGetPos(&startX, &startY)
-    virtualY := startY
+    virtualY := 0  ; Сброс накопленного смещения
     isScrolling := true
     SetTimer(ScrollCheck, 10)
 }
@@ -257,33 +257,31 @@ ScrollCheck()
     
     MouseGetPos(&currentX, &currentY)
     
-    ; Накапливаем виртуальное смещение
-    virtualY += (currentY - startY)
-    delta := virtualY - startY
+    ; Накапливаем смещение относительно стартовой позиции
+    delta := currentY - startY
+    virtualY += delta
     
-    if (Abs(delta) > 5)
+    ; Меньший порог для более плавной прокрутки
+    
+    
+    if (Abs(virtualY) >= scrollThreshold)
     {
-        ; Вычисляем количество шагов прокрутки
-        scrollSteps := Round(Abs(delta) / 15)
-        
-        if (scrollSteps < 1)
-            scrollSteps := 1
-        else if (scrollSteps > 10)
-            scrollSteps := 10
+        ; Вычисляем количество шагов
+        scrollSteps := Floor(Abs(virtualY) / scrollThreshold)
         
         Loop scrollSteps
         {
-            if (delta > 0)
+            if (virtualY > 0)
                 Send("{WheelDown}")
             else
                 Send("{WheelUp}")
         }
         
-        ; Сбрасываем виртуальное смещение после прокрутки
-        virtualY := startY
+        ; Уменьшаем виртуальное смещение на использованное количество
+        virtualY := Mod(virtualY, scrollThreshold) * (virtualY > 0 ? 1 : -1)
     }
     
-    ; Постоянно возвращаем курсор на место
+    ; Возвращаем курсор на место
     MouseMove(startX, startY)
 }
 
