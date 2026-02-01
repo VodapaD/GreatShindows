@@ -1,4 +1,31 @@
-﻿; --- НАСТРОЙКА ГРУППЫ БРАУЗЕРОВ ---
+﻿; ==============================================================================
+;                        НАСТРОЙКИ И ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+; ==============================================================================
+
+; --- Системные настройки ---
+CoordMode "Mouse", "Screen"
+SetWinDelay -1
+
+; --- Настройки анимации центрирования окна (Win + S) ---
+Duration := 300          ; Длительность анимации в миллисекундах (0.3 сек)
+
+; --- Настройки горячего угла ---
+CornerSize := 3          ; Совсем маленький размер, чтобы не мешать в приложениях
+HoverDelay := 50         ; Задержка (мс), чтобы не было ложных срабатываний
+
+; --- Настройки скролинга ---
+scrollThreshold := 5     ; Порог смещения для одного шага скролинга
+
+; --- Глобальные переменные скролинга ---
+global isScrolling := false
+global startX := 0
+global startY := 0
+global virtualY := 0     ; Накопленное смещение
+
+; ==============================================================================
+
+
+; --- НАСТРОЙКА ГРУППЫ БРАУЗЕРОВ ---
 ; Мы добавляем в группу "WebBrowsers" все популярные браузеры.
 ; Скрипт будет искать любое окно из этого списка.
 GroupAdd "WebBrowsers", "ahk_exe chrome.exe"      ; Google Chrome
@@ -55,11 +82,6 @@ GroupAdd "WebBrowsers", "ahk_exe zen.exe"       ; Brave
 ; --- Win + S: ПЕРЕМЕЩЕНИЕ АКТИВНОГО ОКНА В ЦЕНТР ЭКРАНА ---
 #s::
 {
-    ; --- НАСТРОЙКИ ---
-    Duration := 300       ; Длительность анимации в миллисекундах (0.3 сек)
-    ; -----------------
-
-    SetWinDelay -1
     hwnd := WinExist("A")
     if !hwnd || WinGetMinMax(hwnd) = 1
         return
@@ -99,11 +121,6 @@ GroupAdd "WebBrowsers", "ahk_exe zen.exe"       ; Brave
 }
 
 ; --- ОТКРЫТИЕ ОБЗОРА ПРИ НАВЕДЕНИИ КУРСОРА НА ВЕРХНИЙ ЛЕВЫЙ УГОЛ ЭКРАНА ---
-CornerSize := 3       ; Совсем маленький размер, чтобы не мешать в приложениях
-HoverDelay := 50     ; Задержка (мс), чтобы не было ложных срабатываний
-
-; Устанавливаем режим координат мыши относительно ЭКРАНА
-CoordMode "Mouse", "Screen"
 
 SetTimer CheckMouseCorner, 10
 
@@ -226,11 +243,6 @@ IsFullscreenAppActive()
 }
 
 ; === ПЛАВНЫЙ СКРОЛИНГ НА ЗАЖАТИЕ КОЛЕСИКА МЫШКИ ===
-global isScrolling := false
-global startX := 0
-global startY := 0
-global virtualY := 0  ; Накопленное смещение
-scrollThreshold := 5
 
 MButton::
 {
@@ -292,3 +304,98 @@ ScrollCheck()
 *Left::return
 *Right::return
 #HotIf
+
+; ==============================================================================
+; Win + ЛКМ: Перемещение (Используем SysCommand 0xF012)
+; ==============================================================================
+#LButton::{
+    MouseGetPos &startX, &startY, &winId
+    
+    if WinGetClass(winId) = "WorkerW" || WinGetClass(winId) = "Progman"
+        return
+
+    winId := WinExist("ahk_id " winId)
+    topWin := DllCall("GetAncestor", "Ptr", winId, "UInt", 2, "Ptr")
+    if topWin
+        winId := topWin
+
+    if WinGetMinMax(winId) = 1
+        WinRestore winId
+    WinActivate winId
+
+    WinGetPos &winX, &winY,,,winId
+
+    SetWinDelay -1
+    While GetKeyState("LButton", "P") {
+        MouseGetPos &curX, &curY
+        dx := curX - startX
+        dy := curY - startY
+        WinMove winX + dx, winY + dy,,, winId
+        Sleep 1
+    }
+}
+
+; ==============================================================================
+; Win + ПКМ: Изменение размера (4 области)
+; ==============================================================================
+#RButton::{
+    MouseGetPos &startX, &startY, &winId
+    
+    if WinGetClass(winId) = "WorkerW" || WinGetClass(winId) = "Progman"
+        return
+
+    WinActivate winId
+    if WinGetMinMax(winId) = 1
+        WinRestore winId
+
+    WinGetPos &winX, &winY, &winW, &winH, winId
+    
+    ; Определяем, в каком квадранте был клик
+    ; 1 | 2
+    ; --+--
+    ; 3 | 4
+    relX := startX - winX
+    relY := startY - winY
+    
+    isLeft := (relX < winW / 2)
+    isTop  := (relY < winH / 2)
+
+    ; Основной цикл изменения размера
+    While GetKeyState("RButton", "P") {
+        MouseGetPos &curX, &curY
+        dx := curX - startX
+        dy := curY - startY
+        
+        ; Сбрасываем переменные к текущим (чтобы не накапливать ошибки)
+        newX := winX
+        newY := winY
+        newW := winW
+        newH := winH
+
+        ; Логика для 4 углов:
+        
+        ; Если слева - меняем X и Ширину
+        if isLeft {
+            newW := winW - dx
+            newX := winX + dx
+        } else {
+            ; Если справа - меняем только Ширину
+            newW := winW + dx
+        }
+
+        ; Если сверху - меняем Y и Высоту
+        if isTop {
+            newH := winH - dy
+            newY := winY + dy
+        } else {
+            ; Если снизу - меняем только Высоту
+            newH := winH + dy
+        }
+        
+        ; Применяем, если размер не ушел в минус
+        if (newW > 10 && newH > 10)
+            WinMove newX, newY, newW, newH, winId
+            
+        Sleep 1
+    }
+}
